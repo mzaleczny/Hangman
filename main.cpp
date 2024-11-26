@@ -216,7 +216,7 @@ void Render()
         return;
     }
 
-//    Screen.Clear();
+    Screen.Clear();
     PrintGameState();
 
     Screen.DrawText(40, 1, "Total attempts: " + to_string(TotalAttempts) + "  GoodAttempts: " + to_string(TotalAttempts - WrongAttempts) + "  WrongAttempts: " + to_string(WrongAttempts) + ",  Time elapsed: " + to_string(GuessingTimeElapsed));
