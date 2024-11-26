@@ -6,7 +6,24 @@
 #include "Drawings.h"
 using namespace std;
 
+enum class EHangmanState
+{
+    EHS_None,
+    EHS_Head,
+    EHS_Torso,
+    EHS_LeftHand,
+    EHS_RightHand,
+    EHS_LeftLeg,
+    EHS_RightLeg,
+    EHS_Dead,
+    EHS_Number
+};
+
+EHangmanState HangmanState = EHangmanState::EHS_None;
 std::vector<std::string> Phrases;
+std::string CurrentPhrase;
+std::string CurrentPhraseHint;
+std::string UserEnteredPhrase;
 TTerminalScreen Screen;
 bool DoGameLoop;
 
@@ -16,6 +33,7 @@ void GetInput();
 bool Update();
 void Render();
 void Deinitialize();
+void GetRandomPhraseAndRestartGame();
 
 int main()
 {
@@ -47,7 +65,14 @@ bool Initialize()
         PhrasesFile pf;
         pf.ReadPhrases(Phrases);
     }
-    return Phrases.size() > 0;
+
+    if (Phrases.size() > 0)
+    {
+        GetRandomPhraseAndRestartGame();
+        return true;
+    }
+
+    return false;
 }
 
 void PrintGameState()
@@ -75,10 +100,28 @@ bool Update()
 
 void Render()
 {
+    Screen.Clear();
+
     PrintGameState();
+
+    Screen.DrawText(50, 4, "Guess the phrase,  Hint: " + CurrentPhraseHint);
+    Screen.DrawText(52, 5, "Your phrase: [ " + UserEnteredPhrase + " ]");
+    Screen.DrawText(52, 6, "Choose letter: ");
     Screen.PresentScreen();
 }
 
 void Deinitialize()
 {
+}
+
+void GetRandomPhraseAndRestartGame()
+{
+    int Index = rand() % Phrases.size();
+    size_t Pos;
+    if ((Pos = Phrases[Index].find('|')) != string::npos)
+    {
+        CurrentPhrase = Phrases[Index].substr(0, Pos);
+        CurrentPhraseHint = Phrases[Index].substr(Pos + 1);
+        UserEnteredPhrase = std::string(CurrentPhrase.length(), '_');
+    }
 }

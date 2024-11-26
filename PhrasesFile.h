@@ -29,7 +29,22 @@ public:
             while (!file.eof())
             {
                 getline(file, line);
-                Phrases.push_back(line);
+
+                // Trim Left spaces in place
+                line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](unsigned char ch) {
+                    return !std::isspace(ch);
+                    }));
+
+                // Trim right spaces in place
+                line.erase(std::find_if(line.rbegin(), line.rend(), [](unsigned char ch) {
+                    return !std::isspace(ch);
+                    }).base(), line.end());
+
+                // if not empty
+                if (line != "")
+                {
+                    Phrases.push_back(line);
+                }
             }
             file.clear();
             file.seekg(0, std::ios::beg);
