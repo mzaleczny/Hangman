@@ -8,19 +8,34 @@ using namespace std;
 
 std::vector<std::string> Phrases;
 TTerminalScreen Screen;
+bool DoGameLoop;
 
 bool Initialize();
 void PrintGameState();
+void GetInput();
+bool Update();
+void Render();
+void Deinitialize();
 
 int main()
 {
-    if (!Initialize())
+    
+    if (!(DoGameLoop = Initialize()))
     {
         cerr << "ERROR: Initialization error." << endl;
         return -1;
     }
 
-    PrintGameState();
+    while (DoGameLoop) // Game Loop
+    {
+        GetInput();
+        Update();
+        Render();
+        DoGameLoop = false;
+    }
+
+    Deinitialize();
+
 
     return 0;
 }
@@ -47,4 +62,23 @@ void PrintGameState()
     Screen.DrawClippedMultilineText(26, 15, HangmanLeftLeg);
     Screen.DrawClippedMultilineText(34, 15, HangmanRightLeg);
     Screen.PresentScreen();
+}
+
+void GetInput()
+{
+}
+
+bool Update()
+{
+    return false;
+}
+
+void Render()
+{
+    PrintGameState();
+    Screen.PresentScreen();
+}
+
+void Deinitialize()
+{
 }
