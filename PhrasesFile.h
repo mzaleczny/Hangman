@@ -1,3 +1,4 @@
+#include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -10,18 +11,29 @@ public:
     PhrasesFile()
     {
         std::lock_guard<std::mutex> lock(PhrasesFile::mu);
-        file.open("phrases.txt", std::ios::in);
+        OpenFile("phrases.txt");
     }
 
-    PhrasesFile(string filename)
+    PhrasesFile(std::string filename)
     {
         std::lock_guard<std::mutex> lock(PhrasesFile::mu);
-        file.open(filename, std::ios::in);
+        OpenFile(filename);
     }
 
     void ReadPhrases(std::vector<std::string>& Phrases)
     {
-
+        Phrases.clear();
+        if (file)
+        {
+            std::string line;
+            while (!file.eof())
+            {
+                getline(file, line);
+                Phrases.push_back(line);
+            }
+            file.clear();
+            file.seekg(0, std::ios::beg);
+        }
     }
 
     ~PhrasesFile()
@@ -31,6 +43,15 @@ public:
     }
 
 private:
-    static std::mutex mu;
-    std::fstream file;
-}
+    std::mutex mu;
+    std::ifstream file;
+
+    void OpenFile(std::string filename)
+    {
+        file.open(filename, std::ios::in);
+        if (!file)
+        {
+            std::cerr << "Could not open file for reading." << std::endl;
+        }
+    }
+};
