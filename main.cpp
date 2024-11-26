@@ -6,26 +6,27 @@
 #include "PhrasesFile.h"
 #include "TerminalScreen.h"
 #include "Drawings.h"
+#include "Score.h"
 using namespace std;
 
 enum class EGameState
 {
-    EHS_Start,
-    EHS_ScaffoldRoot,
-    EHS_ScaffoldHorizontal,
-    EHS_ScaffoldRope,
-    EHS_Head,
-    EHS_Torso,
-    EHS_LeftHand,
-    EHS_RightHand,
-    EHS_LeftLeg,
-    EHS_RightLeg,
-    EHS_Dead,
-    EHS_TopTen,
-    EHS_Number
+    EGS_Start,
+    EGS_ScaffoldRoot,
+    EGS_ScaffoldHorizontal,
+    EGS_ScaffoldRope,
+    EGS_Head,
+    EGS_Torso,
+    EGS_LeftHand,
+    EGS_RightHand,
+    EGS_LeftLeg,
+    EGS_RightLeg,
+    EGS_GameOver,
+    EGS_TopTen,
+    EGS_Number
 };
 
-EGameState GameState = EGameState::EHS_Start;
+EGameState GameState = EGameState::EGS_Start;
 std::vector<std::string> Phrases;
 std::string CurrentPhrase;
 std::string CurrentPhraseHint;
@@ -36,14 +37,17 @@ TTerminalScreen Screen;
 bool DoGameLoop;
 int WrongAttempts;
 int TotalAttempts;
+uint64_t GuessingTimeElapsed, CurTimePlus15m;
 
 bool Initialize();
 void PrintGameState();
 void GetInput();
-bool Update(uint64_t LastFrameDuration);
+void Update(uint64_t LastFrameDuration);
 void Render();
 void Deinitialize();
 void GetRandomPhraseAndRestartGame();
+void GameOver();
+void TopTen();
 
 #define CUR_TIME_IN_MILLISEC std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
 int main()
@@ -55,7 +59,7 @@ int main()
         return -1;
     }
 
-    uint64_t LastFrameTime = CUR_TIME_IN_MILLISEC;
+    uint64_t LastFrameTime = 0;
     uint64_t FrameStartTime;
     while (DoGameLoop) // Game Loop
     {
@@ -91,23 +95,23 @@ bool Initialize()
 
 void PrintGameState()
 {
-    if (GameState >= EGameState::EHS_ScaffoldRoot)
+    if (GameState >= EGameState::EGS_ScaffoldRoot)
         Screen.DrawClippedMultilineText(5, 2, ScaffoldRoot);
-    if (GameState >= EGameState::EHS_ScaffoldHorizontal)
+    if (GameState >= EGameState::EGS_ScaffoldHorizontal)
         Screen.DrawClippedMultilineText(5, 2, ScaffoldHorizontal);
-    if (GameState >= EGameState::EHS_ScaffoldRope)
+    if (GameState >= EGameState::EGS_ScaffoldRope)
         Screen.DrawClippedMultilineText(32, 2, ScaffoldRope);
-    if (GameState >= EGameState::EHS_Head)
+    if (GameState >= EGameState::EGS_Head)
         Screen.DrawClippedMultilineText(30, 5, HangmanHead);
-    if (GameState >= EGameState::EHS_Torso)
+    if (GameState >= EGameState::EGS_Torso)
         Screen.DrawClippedMultilineText(31, 8, HangmanTorso);
-    if (GameState >= EGameState::EHS_LeftHand)
+    if (GameState >= EGameState::EGS_LeftHand)
         Screen.DrawClippedMultilineText(24, 8, HangmanLeftHand);
-    if (GameState >= EGameState::EHS_RightHand)
+    if (GameState >= EGameState::EGS_RightHand)
         Screen.DrawClippedMultilineText(33, 8, HangmanRightHand);
-    if (GameState >= EGameState::EHS_LeftLeg)
+    if (GameState >= EGameState::EGS_LeftLeg)
         Screen.DrawClippedMultilineText(26, 15, HangmanLeftLeg);
-    if (GameState >= EGameState::EHS_RightLeg)
+    if (GameState >= EGameState::EGS_RightLeg)
         Screen.DrawClippedMultilineText(34, 15, HangmanRightLeg);
 }
 
@@ -138,10 +142,16 @@ void GetInput()
     }
 }
 
-bool Update(uint64_t LastFrameDuration)
+void Update(uint64_t LastFrameDuration)
 {
     static uint64_t TimePeriod = 0;
     TimePeriod += LastFrameDuration;
+    GuessingTimeElapsed += LastFrameDuration;
+
+    if (GameState > EGameState::EGS_RightLeg)
+    {
+        return;
+    }
 
     if (TimePeriod > 1200)
     {
@@ -156,8 +166,12 @@ bool Update(uint64_t LastFrameDuration)
         {
             if (std::tolower(CurrentPhrase[i]) == ch)
             {
-                Hit = true;
-                UserEnteredPhrase[i] = ch;
+                // if the latter was hit previously, then mark miss
+                if (UserEnteredPhrase[i] != ch)
+                {
+                    Hit = true;
+                    UserEnteredPhrase[i] = ch;
+                }
             }
         }
         UserInput = "";
@@ -168,30 +182,44 @@ bool Update(uint64_t LastFrameDuration)
             GameState = (EGameState)((int)GameState + 1);
             GuessResultMessage = "No such letter!";
             TimePeriod = 0;
+            if (GameState >= EGameState::EGS_RightLeg)
+            {
+                GameState = EGameState::EGS_GameOver;
+            }
         }
         else
         {
-            string LowerPhrase;
+            string LowerPhrase = CurrentPhrase;
             transform(CurrentPhrase.begin(), CurrentPhrase.end(), LowerPhrase.begin(), ::tolower);
             if (UserEnteredPhrase == LowerPhrase)
             {
-                DoGameLoop = false;
+                GameState = EGameState::EGS_GameOver;
             }
             GuessResultMessage = "Letter hit!";
             TimePeriod = 0;
         }
     }
     
-    return false;
+    return;
 }
 
 void Render()
 {
-    Screen.Clear();
+    if (GameState == EGameState::EGS_GameOver)
+    {
+        GameOver();
+        return;
+    }
+    else if (GameState == EGameState::EGS_TopTen)
+    {
+        TopTen();
+        return;
+    }
 
+//    Screen.Clear();
     PrintGameState();
 
-    Screen.DrawText(50, 1, "Total attempts: " + to_string(TotalAttempts) + "  GoodAttempts: " + to_string(TotalAttempts - WrongAttempts) + "  WrongAttempts: " + to_string(WrongAttempts));
+    Screen.DrawText(40, 1, "Total attempts: " + to_string(TotalAttempts) + "  GoodAttempts: " + to_string(TotalAttempts - WrongAttempts) + "  WrongAttempts: " + to_string(WrongAttempts) + ",  Time elapsed: " + to_string(GuessingTimeElapsed));
     Screen.DrawText(50, 3, GuessResultMessage);
     Screen.DrawText(50, 5, "Guess the phrase,  Hint: " + CurrentPhraseHint);
     Screen.DrawText(52, 7, "Your phrase: [ " + UserEnteredPhrase + " ]");
@@ -207,6 +235,8 @@ void GetRandomPhraseAndRestartGame()
 {
     WrongAttempts = 0;
     TotalAttempts = 0;
+    GuessingTimeElapsed = 0;
+    CurTimePlus15m = 15 * 60 * 1000; // max period in miliseconds 15minutes
     int Index = rand() % Phrases.size();
     size_t Pos;
     if ((Pos = Phrases[Index].find('|')) != string::npos)
@@ -215,4 +245,65 @@ void GetRandomPhraseAndRestartGame()
         CurrentPhraseHint = Phrases[Index].substr(Pos + 1);
         UserEnteredPhrase = std::string(CurrentPhrase.length(), '_');
     }
+}
+
+void GameOver()
+{
+    string LowerPhrase = CurrentPhrase;
+    string Input;
+    transform(CurrentPhrase.begin(), CurrentPhrase.end(), LowerPhrase.begin(), ::tolower);
+
+    Screen.Clear();
+    Screen.PresentScreen();
+
+    if (UserEnteredPhrase == LowerPhrase)
+    {
+        int Points = (9 - WrongAttempts) * 100 * 1000; // max is 900000 that counterparts to max time of 15 min. Each wrong answers costs 10 secondes (as counterpart)
+        Points += CurrentPhrase.length() * 1000; // make points depend on phrase length too
+        // max allowed time is 15min (in milliseconds), lesser time elapsed - it is better
+        Points += CurTimePlus15m - GuessingTimeElapsed; // count of miliseconds that remained
+        if (Points < 0)
+        {
+            Points = 0;
+        }
+        Points /= 100; // scale down number of points to not to be too large
+
+        cout << "Good job. You guessed phrase correctly. You gained " << Points << " points." << endl << endl;
+
+        TScore score;
+        if (score.GetInsertionPosition(Points) >= 0)
+        {
+            cout << "You got to the top ten list. Type in Your name: ";
+            getline(cin, Input);
+            score.Insert(Points, Input);
+        }
+        else
+        {
+            cout << "Unfortunately You didn't get to the top ten list." << endl;
+        }
+        cout << endl << "Press Enter to continue." << endl;
+        getline(cin, Input);
+    }
+    else
+    {
+        cout << "Failure. You missed guessing the phrase. Press Enter to continue." << endl;
+        getline(cin, Input);
+    }
+    GameState = EGameState::EGS_TopTen;
+}
+
+void TopTen()
+{
+    string Input;
+    TScore score;
+
+    Screen.Clear();
+    Screen.PresentScreen();
+
+    cout << endl << "Top Ten List:" << endl << endl;
+    cout << score.GetScoreTableDataAsString() << endl;
+    cout << endl << "Press Enter to continue." << endl;
+    getline(cin, Input);
+    GameState = EGameState::EGS_Start;
+    GetRandomPhraseAndRestartGame();
 }
